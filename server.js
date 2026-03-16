@@ -9,11 +9,13 @@ const upload = multer({
 });
 
 const PORT = Number(process.env.PORT || 3000);
-const ARK_API_KEY = process.env.ARK_API_KEY || "";
-const ARK_BASE_URL = process.env.ARK_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3";
-const ARK_RESPONSES_PATH = process.env.ARK_RESPONSES_PATH || "/responses";
-const ARK_MODEL = process.env.ARK_MODEL || "ep-20260316134751-xdsck";
+const ARK_API_KEY = normalizeEnvValue(process.env.ARK_API_KEY || "");
+const ARK_BASE_URL = normalizeEnvValue(process.env.ARK_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3");
+const ARK_RESPONSES_PATH = normalizeEnvValue(process.env.ARK_RESPONSES_PATH || "/responses");
+const ARK_MODEL = normalizeEnvValue(process.env.ARK_MODEL || "ep-20260316134751-xdsck");
 const DEVELOPER_ID = "BIY27";
+const DEFAULT_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+const DEFAULT_ARK_RESPONSES_PATH = "/responses";
 
 const SYSTEM_PROMPT = "你是一个资深的销售总监，对于潜在客户的心理和外在表现，有非常强的洞察，也有一套很厉害的销售技巧！擅长于输出简短但有效的分析和建议。";
 
@@ -74,29 +76,41 @@ app.post("/api/analyze", upload.array("images", 20), async (req, res) => {
       }))
     ];
 
-    const apiResponse = await fetch(`${ARK_BASE_URL}${ARK_RESPONSES_PATH}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ARK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: ARK_MODEL,
-        input: [
-          {
-            role: "system",
-            content: [
-              {
-                type: "input_text",
-                text: SYSTEM_PROMPT
-              }
-            ]
-          },
-          { role: "user", content: userContent }
-        ],
-        temperature: 0.4
-      })
+    const requestBody = JSON.stringify({
+      model: ARK_MODEL,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: SYSTEM_PROMPT
+            }
+          ]
+        },
+        { role: "user", content: userContent }
+      ],
+      temperature: 0.4
     });
+    const primaryEndpoint = joinUrl(ARK_BASE_URL, ARK_RESPONSES_PATH);
+    const fallbackEndpoint = joinUrl(DEFAULT_ARK_BASE_URL, DEFAULT_ARK_RESPONSES_PATH);
+    let apiResponse = await requestArk(primaryEndpoint, ARK_API_KEY, requestBody);
+    if (!apiResponse.ok) {
+      const failedText = await apiResponse.text();
+      const lowerFailed = failedText.toLowerCase();
+      const shouldFallback =
+        apiResponse.status === 404 &&
+        (lowerFailed.includes("not_found") || lowerFailed.includes("could not be found")) &&
+        primaryEndpoint !== fallbackEndpoint;
+      if (shouldFallback) {
+        apiResponse = await requestArk(fallbackEndpoint, ARK_API_KEY, requestBody);
+      } else {
+        return res.status(apiResponse.status).json({
+          error: "模型调用失败",
+          detail: failedText
+        });
+      }
+    }
 
     const responseText = await apiResponse.text();
     if (!apiResponse.ok) {
@@ -185,4 +199,27 @@ function extractOutputTextFromResponses(parsed) {
     }
   }
   return collected.join("\n").trim();
+}
+
+function normalizeEnvValue(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^['"`\s]+|['"`\s]+$/g, "");
+}
+
+function joinUrl(baseUrl, pathPart) {
+  const cleanBase = normalizeEnvValue(baseUrl).replace(/\/+$/, "");
+  const cleanPath = normalizeEnvValue(pathPart).replace(/^\/+/, "");
+  return `${cleanBase}/${cleanPath}`;
+}
+
+function requestArk(endpoint, apiKey, requestBody) {
+  return fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: requestBody
+  });
 }
