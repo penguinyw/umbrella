@@ -358,7 +358,11 @@
         setLoading(true);
         try {
           const res = await fetch("/api/analyze", { method: "POST", body: form });
-          const data = await res.json();
+          const responseText = await res.text();
+          const data = parseJsonSafe(responseText);
+          if (!data) {
+            throw new Error(`服务返回了非JSON内容：${responseText.slice(0, 120)}`);
+          }
           if (!res.ok) throw new Error(data.detail || data.error || "请求失败");
           if (data.developer_id && data.developer_id !== DEVELOPER_ID) {
             throw new Error("开发者标识校验失败");
@@ -420,6 +424,15 @@
           ["风险提示", data.risk_points || []]
         ];
         return blocks.map(([title, values]) => `${title}\n${values.map((v) => `- ${v}`).join("\n")}`).join("\n\n");
+      }
+
+      function parseJsonSafe(text) {
+        if (!text || typeof text !== "string") return null;
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
       }
     </script>
   </body>
