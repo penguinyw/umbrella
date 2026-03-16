@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>朋友圈截图客户洞察</title>
+    <style>
+      :root {
+        --bg: #2c1c3f;
+        --text: #fff3ef;
+        --muted: #efd4d8;
+        --panel: rgba(61, 43, 84, 0.78);
+        --panel-soft: rgba(255, 255, 255, 0.14);
+        --line: rgba(255, 173, 184, 0.52);
+        --neon-pink: #ff4d7a;
+        --neon-blue: #33c9ff;
+        --neon-yellow: #ffd166;
+        --danger: #ff5f6d;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 8% 10%, rgba(255, 131, 163, 0.38), transparent 30%),
+          radial-gradient(circle at 92% 12%, rgba(120, 208, 255, 0.3), transparent 28%),
+          radial-gradient(circle at 50% 88%, rgba(255, 217, 148, 0.22), transparent 40%),
+          linear-gradient(180deg, #5a3975 0%, #3d2859 60%, #2b1b41 100%);
+      }
+      .neon-fog {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.02) 0,
+            rgba(255, 255, 255, 0.02) 1px,
+            transparent 1px,
+            transparent 4px
+          );
+        opacity: .1;
+      }
+      .wrap {
+        width: min(96vw, 1680px);
+        margin: 0 auto;
+        padding: 28px 20px 64px;
+      }
+      .headline {
+        margin: 0 0 16px;
+        font-size: clamp(56px, 5.2vw, 86px);
+        letter-spacing: 1px;
+        text-align: center;
+        color: #fff6f2;
+      }
+      .intro {
+        margin: 0 0 14px;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: clamp(20px, 1.55vw, 28px);
+        text-align: center;
+      }
+      .card {
+        margin-bottom: 12px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        backdrop-filter: blur(10px);
+        border-radius: 14px;
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+          0 6px 24px rgba(31, 14, 51, 0.28);
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255, 77, 122, 0), rgba(255, 77, 122, 0.78), rgba(51, 201, 255, 0.78), rgba(51, 201, 255, 0));
+      }
+      .label {
+        font-size: clamp(22px, 1.8vw, 30px);
+        margin-bottom: 12px;
+        color: #ffd9cf;
+        letter-spacing: .4px;
+      }
+      .tip {
+        margin-top: 8px;
+        color: #f5d0d8;
+        font-size: clamp(18px, 1.25vw, 24px);
+      }
+      .counter {
+        margin-top: 8px;
+        font-size: clamp(22px, 1.45vw, 30px);
+        color: var(--neon-blue);
+      }
+      input[type="file"], textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--panel-soft);
+        color: var(--text);
+        border-radius: 10px;
+      }
+      input[type="file"] {
+        padding: 16px;
+        font-size: clamp(20px, 1.35vw, 26px);
+      }
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+        padding: 16px;
+        font-size: clamp(20px, 1.3vw, 24px);
+      }
+      textarea::placeholder { color: #8f7f94; }
+      .error {
+        color: var(--danger);
+        margin-top: 8px;
+        font-size: clamp(18px, 1.2vw, 22px);
+      }
+      .hidden { display: none; }
+      .preview {
+        margin-top: 12px;
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .item {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+      }
+      .item img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 3/4;
+        object-fit: cover;
+      }
+      .item button {
+        position: absolute;
+        right: 6px;
+        top: 6px;
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.62);
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      button {
+        border: none;
+        border-radius: 10px;
+        font-size: clamp(22px, 1.45vw, 30px);
+        padding: 16px 20px;
+      }
+      .primary {
+        flex: 1;
+        color: #fff2f3;
+        font-weight: 700;
+        background: linear-gradient(95deg, #ff4d7a, #ff8a5b);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 6px 20px rgba(255, 77, 122, 0.38);
+      }
+      .copy {
+        background: linear-gradient(95deg, #4f3b66, #3f3157);
+        color: #ffeef3;
+      }
+      button:disabled { opacity: .58; }
+      .loading {
+        margin-top: 10px;
+        color: var(--neon-yellow);
+        font-size: clamp(20px, 1.25vw, 26px);
+      }
+      .result h2 {
+        margin: 0 0 10px;
+        font-size: clamp(30px, 2.1vw, 42px);
+      }
+      .result-grid {
+        display: grid;
+        gap: 14px;
+      }
+      .panel {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 10px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .panel h3 {
+        margin: 0 0 6px;
+        font-size: clamp(22px, 1.5vw, 30px);
+        color: #ffd8c9;
+      }
+      .panel p, .panel li {
+        margin: 0;
+        line-height: 1.65;
+        color: #ffe9ef;
+        font-size: clamp(20px, 1.35vw, 26px);
+      }
+      .panel ul {
+        margin: 0;
+        padding-left: 17px;
+      }
+      .developer-footer {
+        margin-top: 18px;
+        text-align: center;
+        color: #ffe9ef;
+        font-size: clamp(18px, 1.2vw, 24px);
+        letter-spacing: .5px;
+      }
+      .developer-footer strong {
+        color: #ffffff;
+      }
+      @media (max-width: 760px) {
+        .wrap {
+          width: 96vw;
+          padding: 18px 12px 36px;
+        }
+        .headline { font-size: 40px; }
+        .intro { font-size: 16px; }
+        .label { font-size: 20px; }
+        .tip, .counter, .error { font-size: 14px; }
+        input[type="file"], textarea { font-size: 16px; }
+        button { font-size: 18px; }
+        .result h2 { font-size: 26px; }
+        .panel h3 { font-size: 18px; }
+        .panel p, .panel li { font-size: 15px; }
+        .preview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="neon-fog"></div>
+    <main class="wrap">
+      <h1 class="headline">朋友圈截图客户洞察实验室</h1>
+      <p class="intro">上传 5~20 张截图，模型将快速产出兴趣偏好、潜在需求、销售策略与风险点，帮助你把沟通更快带到成交轨道。</p>
+
+      <section class="card">
+        <div class="label">上传截图（PNG / JPG / WEBP）</div>
+        <input id="imagesInput" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+        <div class="tip">单张 ≤ 10MB，建议使用清晰截图。</div>
+        <div id="fileCounter" class="counter">已选 0 张（至少 5 张）</div>
+        <div id="uploadError" class="error hidden"></div>
+        <div id="preview" class="preview"></div>
+      </section>
+
+      <section class="card">
+        <div class="label">补充信息（可选）</div>
+        <div class="grid">
+          <textarea id="industry" placeholder="行业，例如：教育、家装、保险"></textarea>
+          <textarea id="productType" placeholder="产品类型，例如：高客单训练营、SaaS会员"></textarea>
+          <textarea id="goal" placeholder="销售目标，例如：首次破冰、邀约到店、促成成交"></textarea>
+        </div>
+        <div class="actions">
+          <button id="analyzeBtn" class="primary">开始洞察</button>
+          <button id="copyBtn" class="copy" disabled>复制结论</button>
+        </div>
+        <div id="loading" class="loading hidden">模型分析中，请稍候...</div>
+        <div id="apiError" class="error hidden"></div>
+      </section>
+
+      <section id="resultCard" class="card result hidden">
+        <h2>分析结果</h2>
+        <div class="result-grid">
+          <div class="panel"><h3>客户画像摘要</h3><p id="personaSummary"></p></div>
+          <div class="panel"><h3>兴趣标签</h3><ul id="interestTags"></ul></div>
+          <div class="panel"><h3>需求假设</h3><ul id="needHypothesis"></ul></div>
+          <div class="panel"><h3>销售策略</h3><ul id="salesStrategy"></ul></div>
+          <div class="panel"><h3>沟通示例</h3><ul id="communicationExamples"></ul></div>
+          <div class="panel"><h3>风险提示</h3><ul id="riskPoints"></ul></div>
+        </div>
+      </section>
+      <div class="developer-footer">Developer ID: <strong>BIY27</strong></div>
+    </main>
+
+    <script>
+      const DEVELOPER_ID = "BIY27";
+
+      const input = document.getElementById("imagesInput");
+      const preview = document.getElementById("preview");
+      const uploadError = document.getElementById("uploadError");
+      const apiError = document.getElementById("apiError");
+      const loading = document.getElementById("loading");
+      const analyzeBtn = document.getElementById("analyzeBtn");
+      const copyBtn = document.getElementById("copyBtn");
+      const resultCard = document.getElementById("resultCard");
+      const counter = document.getElementById("fileCounter");
+
+      const selectedFiles = [];
+      let latestResultText = "";
+
+      input.addEventListener("change", () => {
+        const incoming = Array.from(input.files || []);
+        for (const file of incoming) {
+          if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) continue;
+          if (selectedFiles.length >= 20) break;
+          selectedFiles.push(file);
+        }
+        input.value = "";
+        renderPreview();
+      });
+
+      analyzeBtn.addEventListener("click", submitAnalyze);
+      copyBtn.addEventListener("click", async () => {
+        if (!latestResultText) return;
+        await navigator.clipboard.writeText(latestResultText);
+        copyBtn.textContent = "已复制";
+        setTimeout(() => (copyBtn.textContent = "复制结论"), 1200);
+      });
+
+      function renderPreview() {
+        preview.innerHTML = "";
+        uploadError.classList.add("hidden");
+        counter.textContent = `已选 ${selectedFiles.length} 张（至少 5 张）`;
+        if (!selectedFiles.length) return;
+        selectedFiles.forEach((file, idx) => {
+          const box = document.createElement("div");
+          box.className = "item";
+          const img = document.createElement("img");
+          img.src = URL.createObjectURL(file);
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "×";
+          remove.onclick = () => {
+            selectedFiles.splice(idx, 1);
+            renderPreview();
+          };
+          box.appendChild(img);
+          box.appendChild(remove);
+          preview.appendChild(box);
+        });
+      }
+
+      async function submitAnalyze() {
+        apiError.classList.add("hidden");
+        if (selectedFiles.length < 5) {
+          uploadError.textContent = "请至少上传 5 张图片";
+          uploadError.classList.remove("hidden");
+          return;
+        }
+        const form = new FormData();
+        selectedFiles.forEach((file) => form.append("images", file));
+        form.append("industry", document.getElementById("industry").value.trim());
+        form.append("productType", document.getElementById("productType").value.trim());
+        form.append("goal", document.getElementById("goal").value.trim());
+
+        setLoading(true);
+        try {
+          const res = await fetch("/api/analyze", { method: "POST", body: form });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || data.error || "请求失败");
+          if (data.developer_id && data.developer_id !== DEVELOPER_ID) {
+            throw new Error("开发者标识校验失败");
+          }
+          fillResult(data.data);
+          resultCard.classList.remove("hidden");
+          copyBtn.disabled = false;
+          latestResultText = toPlainText(data.data);
+          if (data.mock) {
+            apiError.textContent = "当前为演示数据：请配置 ARK_API_KEY 后调用真实模型。";
+            apiError.classList.remove("hidden");
+          }
+        } catch (e) {
+          apiError.textContent = e.message || "调用失败";
+          apiError.classList.remove("hidden");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function setLoading(v) {
+        analyzeBtn.disabled = v;
+        loading.classList.toggle("hidden", !v);
+      }
+
+      function fillResult(data) {
+        document.getElementById("personaSummary").textContent = data.persona_summary || "";
+        fillList("interestTags", data.interest_tags);
+        fillList("needHypothesis", data.need_hypothesis);
+        fillList("salesStrategy", data.sales_strategy);
+        fillList("communicationExamples", data.communication_examples);
+        fillList("riskPoints", data.risk_points);
+      }
+
+      function fillList(id, arr) {
+        const ul = document.getElementById(id);
+        ul.innerHTML = "";
+        const list = Array.isArray(arr) ? arr : [];
+        if (!list.length) {
+          const li = document.createElement("li");
+          li.textContent = "暂无";
+          ul.appendChild(li);
+          return;
+        }
+        list.forEach((v) => {
+          const li = document.createElement("li");
+          li.textContent = v;
+          ul.appendChild(li);
+        });
+      }
+
+      function toPlainText(data) {
+        const blocks = [
+          ["客户画像摘要", [data.persona_summary || ""]],
+          ["兴趣标签", data.interest_tags || []],
+          ["需求假设", data.need_hypothesis || []],
+          ["销售策略", data.sales_strategy || []],
+          ["沟通示例", data.communication_examples || []],
+          ["风险提示", data.risk_points || []]
+        ];
+        return blocks.map(([title, values]) => `${title}\n${values.map((v) => `- ${v}`).join("\n")}`).join("\n\n");
+      }
+    </script>
+  </body>
+</html>
